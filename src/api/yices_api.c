@@ -9495,6 +9495,7 @@ EXPORTED void yices_disable_unsat_core(context_t *ctx) {
 smt_status_t yices_check_with_assumptions(context_t *ctx,  const param_t *params, uint32_t n, const term_t t[], ivector_t *v) {
   smt_status_t stat;
   uint32_t i, j;
+  bool found_core = false;
 
    // reset the output vector
   ivector_reset(v);
@@ -9538,7 +9539,7 @@ smt_status_t yices_check_with_assumptions(context_t *ctx,  const param_t *params
 
 #if TRACE
     printf("Context before adding assertions:\n");
-    dump_context(stdout, ctx);
+//    dump_context(stdout, ctx);
     print_smt_core(stdout, ctx->core);
 #endif
 
@@ -9553,7 +9554,7 @@ smt_status_t yices_check_with_assumptions(context_t *ctx,  const param_t *params
 
 #if TRACE
     printf("Context before adding indicators:\n");
-    dump_context(stdout, ctx);
+//    dump_context(stdout, ctx);
     print_smt_core(stdout, ctx->core);
 #endif
 
@@ -9567,11 +9568,11 @@ smt_status_t yices_check_with_assumptions(context_t *ctx,  const param_t *params
 
 #if TRACE
     printf("Context after adding indicators:\n");
-    dump_context(stdout, ctx);
+//    dump_context(stdout, ctx);
     print_smt_core(stdout, ctx->core);
 #endif
 
-    if (i < n && t[i] == false_term) {
+    if (i < n) {
       /*
        * Special case: we got TRIVIALLY_UNSAT afer asserting indicators.data[i]
        * We know that the unsat core is included in t[0 ... i].
@@ -9580,20 +9581,27 @@ smt_status_t yices_check_with_assumptions(context_t *ctx,  const param_t *params
        * (not indicator[i]). When we assert indicator[i], assert_formula
        * reports that it's trivially unast.
        */
-      // if t[i] is false, then it's the core.
       assert(code == TRIVIALLY_UNSAT);
-      ivector_push(v, t[i]);
       stat = STATUS_UNSAT;
 
-    } else {
+      if (t[i] == false_term) {
+        // if t[i] is false, then it's the core.
+        ivector_push(v, t[i]);
+        found_core = true;
+      }
+    }
+    else {
       /*
        * No contradiction detected so far.
        */
       assert(context_status(ctx) == STATUS_IDLE);
+    }
 
-      // check context with assumptions
-      //      stat = yices_check_context(ctx, params);
-      stat = check_context(ctx, params);
+    if (! found_core) {
+      if (stat != STATUS_UNSAT) {
+        // check context with assumptions
+        stat = check_context(ctx, params);
+      }
 
       // if UNSAT, identify indicators and collect unsat core
       if (stat == STATUS_UNSAT) {
@@ -9604,15 +9612,24 @@ smt_status_t yices_check_with_assumptions(context_t *ctx,  const param_t *params
 #else
 	(void) yices_derive_unsat_core(ctx);
 #endif
-	//       bool success = true; NOT USED
 	for (i = 0; i < n; i++) {
 	  term_t lhsT = indicators.data[i];
-	  int32_t value = check_term_in_unsat_core(ctx, lhsT);
-	  if (value != 0) {
-	    term_t rhsT = t[i];
-	    ivector_push(v, rhsT);
-	  }
-	  //        success &= (value != -1); NOT USED
+    term_t rhsT = t[i];
+
+    // TODO: Since current implementation of unsat core cannot handle
+	  // theory solvers apart from bit-vectors and egraph, forcefully add
+	  // terms that involve other theories (i.e. require simplex/floyd_warshall/funs solver)
+//    bool force_add = require_unsupported_theories(rhsT);
+    bool force_add = false;
+
+    if (force_add)
+      ivector_push(v, rhsT);
+    else {
+      int32_t value = check_term_in_unsat_core(ctx, lhsT);
+      if (value != 0) {
+        ivector_push(v, rhsT);
+      }
+    }
 	}
       }
     }
