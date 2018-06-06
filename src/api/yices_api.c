@@ -98,6 +98,8 @@
 #include "utils/sparse_arrays.h"
 #include "utils/string_utils.h"
 
+#define TRACE 0
+
 #ifdef HAVE_MCSAT
 #include <poly/algebraic_number.h>
 #else
@@ -9523,8 +9525,22 @@ smt_status_t yices_check_with_assumptions(context_t *ctx,  const param_t *params
       term_t rhsT = t[i];
 
       ivector_push(&indicators, lhsT);
-      ivector_push(&assertions, yices_implies(lhsT, rhsT));
+
+      term_t cond = yices_implies(lhsT, rhsT);
+      ivector_push(&assertions, cond);
+
+#if TRACE
+      printf("Asserting formula: ");
+      print_term(stdout, ctx->terms, cond);
+      printf("\n");
+#endif
     }
+
+#if TRACE
+    printf("Context before adding assertions:\n");
+    dump_context(stdout, ctx);
+    print_smt_core(stdout, ctx->core);
+#endif
 
     // assert all assertions: the context should will be IDLE
     // because the  assertions can't be trivially unsat.
@@ -9535,6 +9551,12 @@ smt_status_t yices_check_with_assumptions(context_t *ctx,  const param_t *params
     // to set the base level
     yices_push(ctx);
 
+#if TRACE
+    printf("Context before adding indicators:\n");
+    dump_context(stdout, ctx);
+    print_smt_core(stdout, ctx->core);
+#endif
+
     // assert assumptions (indicators) one by one
     for (i = 0; i < n; i++) {
       term_t lhsT = indicators.data[i];
@@ -9543,7 +9565,13 @@ smt_status_t yices_check_with_assumptions(context_t *ctx,  const param_t *params
       if (code == TRIVIALLY_UNSAT) break;
     }
 
-    if (i < n) {
+#if TRACE
+    printf("Context after adding indicators:\n");
+    dump_context(stdout, ctx);
+    print_smt_core(stdout, ctx->core);
+#endif
+
+    if (i < n && t[i] == false_term) {
       /*
        * Special case: we got TRIVIALLY_UNSAT afer asserting indicators.data[i]
        * We know that the unsat core is included in t[0 ... i].
@@ -9552,16 +9580,9 @@ smt_status_t yices_check_with_assumptions(context_t *ctx,  const param_t *params
        * (not indicator[i]). When we assert indicator[i], assert_formula
        * reports that it's trivially unast.
        */
+      // if t[i] is false, then it's the core.
       assert(code == TRIVIALLY_UNSAT);
-      if (t[i] == false_term) {
-	// if t[i] is false, then it's the core.
-	ivector_push(v, t[i]);
-      } else {
-	// just to be sound: we store t[0] ... t[i] as the unsat core
-	for (j=0; j<=i; j++) {
-	  ivector_push(v, t[j]);
-	}
-      }
+      ivector_push(v, t[i]);
       stat = STATUS_UNSAT;
 
     } else {

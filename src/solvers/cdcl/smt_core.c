@@ -2758,7 +2758,46 @@ static bool theory_propagation(smt_core_t *s) {
   return s->th_ctrl.propagate(s->th_solver) && !s->inconsistent;
 }
 
+#if TRACE
+/*
+ * Print antecedent of literal l
+ */
+void print_antecedents(FILE *f, smt_core_t *s, literal_t l, antecedent_t a) {
+  literal_t l1;
+  uint32_t i;
+  clause_t *cl;
+  literal_t *c;
 
+  switch (antecedent_tag(a)) {
+  case clause0_tag:
+  case clause1_tag:
+    cl = clause_antecedent(a);
+    fputs(" clause antecedent ", f);
+    print_clause(f, cl);
+    break;
+
+  case literal_tag:
+    l1 = literal_antecedent(a);
+    fputs(", literal antecedent ", f);
+    print_literal(f, l1);
+    break;
+
+  case generic_tag:
+    fputs(", generic antecedent ", f);
+    explain_full_antecedent(s, l, a);
+    c = s->explanation.data;
+    // (and c[0] ... c[n-1]) implies (not l)
+    fputs(" (and ", f);
+    for (i=0; i<s->explanation.size; i++) {
+        l1 = c[i];
+        print_literal(f, l1);
+        fputc(' ', f);
+    }
+    fputc(')', f);
+    break;
+  }
+}
+#endif
 
 /************************
  *   FULL PROPAGATION   *
@@ -3361,7 +3400,7 @@ static void explain_antecedent(smt_core_t *s, literal_t l, antecedent_t a) {
  * IMPORTANT: the theory solver must ensure causality. All literals in s->explanation
  * must be before l in the assignment/propagation stack.
  */
-static void explain_full_antecedent(smt_core_t *s, literal_t l, antecedent_t a) {
+ void explain_full_antecedent(smt_core_t *s, literal_t l, antecedent_t a) {
   assert(literal_value(s, l) == VAL_TRUE && a == s->full_antecedent[var_of(l)] &&
          antecedent_tag(a) == generic_tag);
 
@@ -3815,7 +3854,7 @@ void derive_conflict_core(smt_core_t *s) {
       add_root_antecedants(s, l, true, &marks, true);
 #if TRACE
       ivector_remove_duplicates(&s->conflict_root);
-      print_conflict_core(stdout, s);
+      print_conflict_roots(stdout, s);
       fflush(stdout);
 #endif
       i ++;
@@ -3826,7 +3865,7 @@ void derive_conflict_core(smt_core_t *s) {
   s->core_status = core_ready;
 
 #if TRACE
-  print_conflict_core(stdout, s);
+  print_conflict_roots(stdout, s);
   fflush(stdout);
 #endif
 
@@ -3896,6 +3935,7 @@ static void resolve_conflict_core(smt_core_t *s, uint32_t conflict_level) {
     assert(d_level(s, b) > s->base_level);
 
 #if TRACE
+    printf(" d%d ", d_level(s, b));
     a = s->antecedent[var_of(b)];
     fputs(" anc ", stdout);
     print_antecedents(stdout, s, b, a);
@@ -4335,7 +4375,7 @@ static void add_simplified_binary_clause(smt_core_t *s, literal_t l0, literal_t 
 
   direct_binary_clause(s, l0, l1); // add the clause
 
-  if (s->base_level == s->decision_level) {
+  if (!s->unsat_core_enabled && s->base_level == s->decision_level) {
     assert(literal_is_unassigned(s, l0) && literal_is_unassigned(s, l1));
     return;
   }
@@ -4779,7 +4819,7 @@ static uint32_t lemma_length(literal_t *a) {
  * - a = array of literals (lemma is a[0] ... a[n-1])
  */
 static void add_lemma(smt_core_t *s, uint32_t n, literal_t *a) {
-  if (preprocess_clause(s, &n, a)) {
+  if (s->unsat_core_enabled || preprocess_clause(s, &n, a)) {
     if (n > 2) {
       add_simplified_clause(s, n, a);
     } else if (n == 2) {
@@ -6853,8 +6893,10 @@ static void check_propagation_bin(smt_core_t *s, literal_t l0) {
   l1 = *v ++;
   while (l1 >= 0) {
     if (literal_is_unassigned(s, l1)) {
+      print_binary_clause(stdout, l0, l1);
       printf("ERROR: missed propagation. Binary clause {%"PRId32", %"PRId32"}\n", l0, l1);
     } else if (literal_value(s, l1) == VAL_FALSE) {
+      print_binary_clause(stdout, l0, l1);
       printf("ERROR: missed conflict. Binary clause {%"PRId32", %"PRId32"}\n", l0, l1);
     }
     l1 = *v ++;
@@ -6915,6 +6957,7 @@ static void check_propagation_clause(smt_core_t *s, clause_t *cl) {
   }
 
   if (nt == 0 && nu == 0) {
+    print_clause(stdout, cl);
     printf("ERROR: missed conflict. Clause {%"PRId32", %"PRId32"", l0, l1);
     i = 2;
     l = d[i];
@@ -6927,6 +6970,7 @@ static void check_propagation_clause(smt_core_t *s, clause_t *cl) {
   }
 
   if (nt == 0 && nu == 1) {
+    print_clause(stdout, cl);
     printf("ERROR: missed propagation. Clause {%"PRId32", %"PRId32"", l0, l1);
     i = 2;
     l = d[i];

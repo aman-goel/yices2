@@ -35,7 +35,7 @@
 #include "solvers/funs/fun_solver.h"
 #include "solvers/simplex/simplex.h"
 
-
+#define TRACE 0
 
 /*
  * TRACE FUNCTIONS
@@ -883,6 +883,9 @@ void context_disable_unsat_core(context_t *ctx) {
 int32_t derive_unsat_core(context_t *ctx) {
   smt_core_t *core = ctx->core;
   derive_conflict_core(core);
+#if TRACE
+  print_smt_core(stdout, core);
+#endif
   return core->core_status;
 }
 
