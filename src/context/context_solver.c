@@ -962,7 +962,7 @@ void context_build_model(model_t *model, context_t *ctx) {
     if (good_term_idx(terms, i)) {
       t = pos_occ(i);
       if (term_kind(terms, t) == UNINTERPRETED_TERM) {
-        build_term_value(ctx, model, t);
+	build_term_value(ctx, model, t);
       }
     }
   }
@@ -1036,9 +1036,17 @@ bval_t context_bool_term_value(context_t *ctx, term_t t) {
 /*
  * Enables unsat core
  */
-extern void context_enable_unsat_core(context_t *ctx) {
+void context_enable_unsat_core(context_t *ctx) {
   smt_core_t *core = ctx->core;
   enable_unsat_core(core);
+}
+
+/*
+ * Disables unsat core
+ */
+void context_disable_unsat_core(context_t *ctx) {
+  smt_core_t *core = ctx->core;
+  disable_unsat_core(core);
 }
 
 /*
@@ -1047,11 +1055,11 @@ extern void context_enable_unsat_core(context_t *ctx) {
  * - returns 1 when t is present in unsat core
  * - returns -1 when unable to determine
  */
-extern int32_t derive_unsat_core(context_t *ctx) {
+int32_t derive_unsat_core(context_t *ctx) {
   smt_core_t *core = ctx->core;
   derive_conflict_core(core);
 #if TRACE
-  print_conflict_core(stdout, core);
+  print_smt_core(stdout, core);
 #endif
   return core->core_status;
 }
@@ -1064,7 +1072,7 @@ extern int32_t derive_unsat_core(context_t *ctx) {
  */
 int32_t check_term_in_unsat_core(context_t *ctx, term_t r) {
   smt_core_t *core = ctx->core;
-  ivector_t *conflict_core;
+  ivector_t *conflict_roots;
   intern_tbl_t *tbl;
   term_table_t *terms;
   bvar_t x;
@@ -1077,8 +1085,7 @@ int32_t check_term_in_unsat_core(context_t *ctx, term_t r) {
 #endif
 
   if (core->core_status == core_ready) {
-//    conflict_core = &core->conflict_core;
-    conflict_core = &core->conflict_root;
+    conflict_roots = &core->conflict_root;
     tbl = &ctx->intern;
     terms = tbl->terms;
 
@@ -1093,13 +1100,13 @@ int32_t check_term_in_unsat_core(context_t *ctx, term_t r) {
           print_bvar(stdout, x);
 #endif
 
-          n = conflict_core->size;
+          n = conflict_roots->size;
           for (i = 0; i < n; i++) {
 
 //          fputs("\nrhs: ", stdout);
 //          print_bvar(stdout, conflict_core->data[i]);
 
-            if (x == conflict_core->data[i])
+            if (x == conflict_roots->data[i])
             {
 #if TRACE
               printf(", matched\n");
@@ -1248,7 +1255,6 @@ bool trace_implication(context_t *ctx, term_t r) {
         init_int_hmap(&marks, 0);
 
         core->core_status = core_fail;
-        ivector_reset(&core->conflict_core);
         ivector_reset(&core->conflict_root);
         add_root_antecedants(core, l, polarity, &marks, false);
 
@@ -1282,7 +1288,7 @@ int32_t check_term_in_root(context_t *ctx, term_t r) {
 #endif
 
   if (core->core_status == core_ready) {
-    conflict_root = &core->conflict_core;
+    conflict_root = &core->conflict_root;
     tbl = &ctx->intern;
     terms = tbl->terms;
 

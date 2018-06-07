@@ -463,6 +463,18 @@ __YICES_DLLSPEC__ extern int32_t yices_test_subtype(type_t tau, type_t sigma);
 
 
 /*
+ * Check whether tau and sigma are compatible
+ * - return 0 for false, 1 for true
+ *
+ * If tau or sigma is not a valid type, the function returns 0 and
+ * sets the error report:
+ *   code = INVALID_TYPE
+ *   type1 = tau or sigma
+ */
+__YICES_DLLSPEC__ extern int32_t yices_compatible_types(type_t tau, type_t sigma);
+
+
+/*
  * Number of bits for type tau
  * - returns 0 if there's an error
  *
@@ -2816,7 +2828,15 @@ __YICES_DLLSPEC__ extern int32_t yices_set_config(ctx_config_t *config, const ch
  * (arrays + uninterpreted functions + mixed linear arithmetic), but this logic is
  * not currently supported.
  *
+ * Since release 2.6.0, you can also use the name "ALL" as a logic
+ * name.  This has the same interpretation as using "(set-logic ALL)
+ * in yices-smt2. For the current release, this logic name specifies
+ * quantifier-free combination of arrays + uninterpreted functions +
+ * mixed linear arithmetic + bitvectors.
+ *
+ *
  * Error codes:
+ *
  *  CTX_UNKNOWN_LOGIC if logic is not a valid name
  *  CTX_LOGIC_NOT_SUPPORTED if logic is known but not supported
  */
@@ -4043,7 +4063,6 @@ __YICES_DLLSPEC__ extern char *yices_term_to_string(term_t t, uint32_t width, ui
  */
 __YICES_DLLSPEC__ extern char *yices_model_to_string(model_t *mdl, uint32_t width, uint32_t height, uint32_t offset);
 
-
 /*
  * Collects presearch statistics in ctx
  *
@@ -4083,7 +4102,21 @@ __YICES_DLLSPEC__ extern int32_t yices_get_eterm_relation(context_t *ctx, model_
 /*
  * Enables the unsat core.
  */
-__YICES_DLLSPEC__ extern void y2_enable_unsat_core(context_t *ctx);
+__YICES_DLLSPEC__ extern void yices_enable_unsat_core(context_t *ctx);
+
+/*
+ * Disables the unsat core.
+ */
+__YICES_DLLSPEC__ extern void yices_disable_unsat_core(context_t *ctx);
+
+/*
+ * Same as yices_check_context, but with assumptions (for unsat core extraction).
+ * - ctx must support push/pop
+ * - t must be an array of n formulas t[0 ... n-1], each formula is a boolean term
+ * - v: term_vector to return the resulting unsat core if any (assumed to be already initialized). Empty if unsat core unavailable.
+ *
+ */
+__YICES_DLLSPEC__ extern smt_status_t yices_check_assumptions(context_t *ctx, const param_t *params, uint32_t n, const term_t t[], term_vector_t *v);
 
 /*
  * Computes the unsat core.
@@ -4096,7 +4129,7 @@ __YICES_DLLSPEC__ extern void y2_enable_unsat_core(context_t *ctx);
  * If the check fails for other reasons:
  *   code = INTERNAL_EXCEPTION
  */
-__YICES_DLLSPEC__ extern int32_t y2_derive_unsat_core(context_t *ctx);
+__YICES_DLLSPEC__ extern int32_t yices_derive_unsat_core(context_t *ctx);
 
 /*
  * Checks whether a boolean term is in unsat core or not: returned as an integer val
@@ -4111,7 +4144,7 @@ __YICES_DLLSPEC__ extern int32_t y2_derive_unsat_core(context_t *ctx);
  * If the check fails for other reasons:
  *   code = INTERNAL_EXCEPTION
  */
-__YICES_DLLSPEC__ extern int32_t y2_term_in_unsat_core(context_t *ctx, term_t t, int32_t *val);
+__YICES_DLLSPEC__ extern int32_t yices_term_in_unsat_core(context_t *ctx, term_t t, int32_t *val);
 
 /*
  * Checks whether a boolean term is in unsat core or not: returned as an integer val

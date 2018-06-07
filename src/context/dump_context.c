@@ -34,7 +34,9 @@
 #include "solvers/floyd_warshall/rdl_fw_printer.h"
 #include "solvers/simplex/simplex_printer.h"
 
+#ifndef NDEBUG
 #include "api/yices_globals.h"
+#endif
 
 #include "context/context_types.h"
 #include "context/internalization_codes.h"
@@ -115,7 +117,6 @@ static void dump_bv_solver(FILE *f, bv_solver_t *solver) {
 }
 
 
-
 /*
  * Print relations between a term, it's eterm and root eterm.
  */
@@ -183,7 +184,7 @@ static void print_term_in_egraph(FILE *f, context_t *ctx, term_t t) {
  * Print relations between terms, eterms and root eterms.
  */
 static void print_terms_in_egraph(FILE *f, context_t *ctx) {
-  term_table_t *tbl = __yices_globals.terms;
+  term_table_t *tbl = ctx->terms;
 
   uint32_t i, n;
   term_t t;
@@ -208,8 +209,22 @@ static void print_terms_in_egraph(FILE *f, context_t *ctx) {
 void dump_context(FILE *f, context_t *context) {
   assert(context != NULL);
 
+#ifndef NDEBUG
+  fprintf(f, "--- All terms ---\n");
+  pp_term_table(f, __yices_globals.terms);
+  fputc('\n', f);
+
+  fprintf(f, "--- Substitutions ---\n");
+  print_context_intern_subst(f, context);
+
+  fprintf(f, "\n--- Internalization ---\n");
+  print_context_intern_mapping(f, context);
+
+  fprintf(f, "\n--- Gates ---\n");
+  print_gate_table(f, &context->gate_manager.htbl);
+#endif
+
   if (context_has_egraph(context)) {
-//    print_terms_in_egraph(f, context);
     dump_egraph(f, context->egraph);
   }
 
@@ -228,26 +243,9 @@ void dump_context(FILE *f, context_t *context) {
     dump_bv_solver(f, context->bv_solver);
   }
 
-  print_smt_core(f, context->core);
-
-#ifndef NDEBUG
-//  fprintf(f, "--- All terms ---\n");
-//  pp_term_table(f, __yices_globals.terms);
-//  fputc('\n', f);
-
-  fprintf(f, "--- Substitutions ---\n");
-  print_context_intern_subst(f, context);
-
-  fprintf(f, "\n--- Internalization ---\n");
-  print_context_intern_mapping(f, context);
-
-  fprintf(f, "\n--- Gates ---\n");
-  print_gate_table(f, &context->gate_manager.htbl);
-#endif
-
-//  fprintf(f, "--- Clauses ---\n");
-//  print_clauses(f, context->core);
-//  fprintf(f, "\n");
+  fprintf(f, "--- Clauses ---\n");
+  print_clauses(f, context->core);
+  fprintf(f, "\n");
 
 #if 0
   fprintf(f, "--- Auxiliary vectors ---\n");

@@ -65,6 +65,7 @@ void init_model(model_t *model, term_table_t *terms, bool keep_subst) {
   init_arena(&model->arena);
 }
 
+
 /*
  * Delete model: free all memory
  */

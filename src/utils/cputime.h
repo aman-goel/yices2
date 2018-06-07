@@ -38,7 +38,6 @@
 extern double get_cpu_time(void);
 
 
-
 /*
  * When printing time differences (t1 - t2),
  * it may happen that rounding errors cause the difference

@@ -1647,6 +1647,8 @@ static void bv_solver_bitblast_atoms(bv_solver_t *solver) {
     if (i < solver->bbptr + 20) {
       printf("BVSOLVER: bitblasting atom[%"PRIu32"]: ", i + solver->bbptr);
       print_bv_solver_atom(stdout, solver, i);
+      printf("\t:= ");
+      print_literal(stdout, l);
       printf("\n");
     } else if (i == solver->bbptr + 20) {
       printf("...\n\n");
