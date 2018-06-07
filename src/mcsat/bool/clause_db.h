@@ -45,9 +45,6 @@ typedef struct {
   /** Type of the clause */
   mcsat_clause_type_t type;
 
-  /** Level of the clause */
-  uint32_t level;
-
   union {
     /** The variable that is defined */
     variable_t var;
@@ -71,6 +68,17 @@ typedef struct {
   mcsat_clause_t clause;
 
 } mcsat_tagged_clause_t;
+
+/**
+ * Lemma clauses in addition contains a score.
+ */
+typedef struct {
+  /** Score */
+  float score;
+  /** The clause itself */
+  mcsat_clause_t clause;
+} mcsat_lemma_clause_t;
+
 
 /** Null clause */
 #define clause_ref_null 0

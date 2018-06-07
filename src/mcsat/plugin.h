@@ -39,10 +39,8 @@ typedef enum {
   MCSAT_SOLVER_START,
   /** Each time a restart is initiated */
   MCSAT_SOLVER_RESTART,
-  /** Each time a conflict is encountered */
-  MCSAT_SOLVER_CONFLICT,
-  /** Each time we do a user pop, before garbage collection */
-  MCSAT_SOLVER_POP
+  /** Eech time a conflict is encountered */
+  MCSAT_SOLVER_CONFLICT
 } plugin_notify_kind_t;
 
 /**
