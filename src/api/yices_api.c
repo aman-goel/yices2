@@ -101,6 +101,7 @@
 #include "utils/string_utils.h"
 
 #define TRACE 0
+#define DEBUG 1
 
 #ifdef HAVE_MCSAT
 #include <poly/algebraic_number.h>
@@ -9566,7 +9567,7 @@ EXPORTED void yices_disable_unsat_core(context_t *ctx) {
  * assumptions are all valid Boolean terms.
  */
 smt_status_t yices_check_with_assumptions(context_t *ctx,  const param_t *params, uint32_t n, const term_t t[], ivector_t *v) {
-  smt_status_t stat;
+  smt_status_t stat, stat2;
   uint32_t i, j;
   bool found_core = false;
 
@@ -9718,6 +9719,25 @@ smt_status_t yices_check_with_assumptions(context_t *ctx,  const param_t *params
 
     delete_ivector(&indicators);
     delete_ivector(&assertions);
+
+#if DEBUG
+    if (stat == STATUS_UNSAT) {
+      yices_push(ctx);
+
+      assert(context_status(ctx) == STATUS_IDLE);
+      code = assert_formulas(ctx, v->size, v->data);
+      assert(code == CTX_NO_ERROR && context_status(ctx) == STATUS_IDLE);
+
+      stat2 = check_context(ctx, params);
+      if (stat2 != STATUS_UNSAT) {
+//        printf("(error: unsat core is incorrect: status = %d)\n", stat2);
+        ivector_reset(v);
+        error.code = INTERNAL_EXCEPTION;
+        stat = STATUS_ERROR;
+      }
+      yices_pop(ctx);
+    }
+#endif
     break;
 
   case STATUS_UNKNOWN:
