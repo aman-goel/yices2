@@ -813,67 +813,59 @@ static void assert_ordef_clauses(bit_blaster_t *s, literal_t x, ivector_t *v) {
 
   switch (base_value(s, x)) {
   case VAL_FALSE:
-    if (s->solver->unsat_core_enabled)
-      goto default_case;
     for (i=0; i<n; i++) {
       bit_blaster_add_unit_clause(s, not(a[i]));
     }
     break;
 
-  case VAL_TRUE:
-    if (s->solver->unsat_core_enabled)
-      goto default_case;
-    bit_blaster_add_clause(s, n, a);
-    break;
-
   case VAL_UNDEF_FALSE:
   case VAL_UNDEF_TRUE:
-    goto default_case;
-    break;
-  }
-  return;
-
-  default_case:
-  k = find_in_vector(v, x);
-  if (k < 0) {
-    // No simplifications
-    for (i=0; i<n; i++) {
-      bit_blaster_add_binary_clause(s, x, not(a[i]));
-    }
-    ivector_push(v, not(x));
-    bit_blaster_add_clause(s, n+1, v->data);
-
-  } else {
-    assert(0 <= k && k < n);
-
-    aux = a[k];
-    if (x == aux) {
-      /*
-       * Constraint x == (or a[0] ... x ... a[n-1])
-       * Need clauses { x, ~a[0] } ... { x, ~a[n-1] }
-       */
+    k = find_in_vector(v, x);
+    if (k < 0) {
+      // No simplifications
       for (i=0; i<n; i++) {
-        if (i != k) {
-          assert(a[i] != x && a[i] != not(x));
-          bit_blaster_add_binary_clause(s, x, not(a[i]));
-        }
+        bit_blaster_add_binary_clause(s, x, not(a[i]));
       }
+      ivector_push(v, not(x));
+      bit_blaster_add_clause(s, n+1, v->data);
+
     } else {
-      /*
-       * Constraint x == (or a[0] ... ~x ... a[n-1])
-       * Clauses: { x } and { a[0], ..., a[n-1] }
-       */
-      assert(aux == not(x));
-      bit_blaster_add_unit_clause(s, x);
+      assert(0 <= k && k < n);
 
-      // remove ~x from v (may be overkill?)
-      for (i=k+1; i<n; i++) {
-        assert(a[i] != x && a[i] != not(x));
-        a[i-1] = a[i];
+      aux = a[k];
+      if (x == aux) {
+        /*
+         * Constraint x == (or a[0] ... x ... a[n-1])
+         * Need clauses { x, ~a[0] } ... { x, ~a[n-1] }
+         */
+        for (i=0; i<n; i++) {
+          if (i != k) {
+            assert(a[i] != x && a[i] != not(x));
+            bit_blaster_add_binary_clause(s, x, not(a[i]));
+          }
+        }
+      } else {
+        /*
+         * Constraint x == (or a[0] ... ~x ... a[n-1])
+         * Clauses: { x } and { a[0], ..., a[n-1] }
+         */
+        assert(aux == not(x));
+        bit_blaster_add_unit_clause(s, x);
+
+        // remove ~x from v (may be overkill?)
+        for (i=k+1; i<n; i++) {
+          assert(a[i] != x && a[i] != not(x));
+          a[i-1] = a[i];
+        }
+        bit_blaster_add_clause(s, n-1, a);
+
       }
-      bit_blaster_add_clause(s, n-1, a);
-
     }
+    break;
+
+  case VAL_TRUE:
+    bit_blaster_add_clause(s, n, a);
+    break;
   }
 }
 
@@ -2263,53 +2255,45 @@ void bit_blaster_make_bveq2(bit_blaster_t *s, literal_t *a, literal_t *b, litera
 
   switch (base_value(s, l)) {
   case VAL_FALSE:
-    if (s->solver->unsat_core_enabled)
-      goto default_case;
     bit_blaster_assert_bvneq(s, a, b, n);
     break;
 
   case VAL_TRUE:
-    if (s->solver->unsat_core_enabled)
-      goto default_case;
     bit_blaster_assert_bveq(s, a, b, n);
     break;
 
   default:
-    goto default_case;
+    v = &s->aux_vector2;
+    resize_ivector(v, n);
+    ivector_reset(v);
+    aux = v->data;
+
+    /*
+     * We want aux[i] = (xor a[i] b[i]) for i=0 to n-1
+     * The first pass does not create any new gate or literal, but it
+     * may leave aux[i] undefined (i.e., null_literal).
+     * The second pass builds aux[i] := (xor a[i] b[i]) for real.
+     */
+    for (i=0; i<n; i++) {
+      aux[i] = find_xor2(s, a[i], b[i]);
+      if (aux[i] == true_literal) {
+        // l must be false since a[i] != b[i]
+        bit_blaster_add_unit_clause(s, not(l));
+        return;
+      }
+    }
+    for (i=0; i<n; i++) {
+      if (aux[i] == null_literal) {
+        // TODO?: use a simpler/faster constructor
+        // rather than the generic make_xor2
+        aux[i] = bit_blaster_make_xor2(s, a[i], b[i]);
+      }
+    }
+
+    // assert not(l) == (or (xor a[0] b[0]) ... (xor a[n-1] b[n-1]))
+    bit_blaster_or_gate(s, n, aux, not(l));
     break;
   }
-  return;
-
-  default_case:
-  v = &s->aux_vector2;
-  resize_ivector(v, n);
-  ivector_reset(v);
-  aux = v->data;
-
-  /*
-   * We want aux[i] = (xor a[i] b[i]) for i=0 to n-1
-   * The first pass does not create any new gate or literal, but it
-   * may leave aux[i] undefined (i.e., null_literal).
-   * The second pass builds aux[i] := (xor a[i] b[i]) for real.
-   */
-  for (i=0; i<n; i++) {
-    aux[i] = find_xor2(s, a[i], b[i]);
-    if (aux[i] == true_literal) {
-      // l must be false since a[i] != b[i]
-      bit_blaster_add_unit_clause(s, not(l));
-      return;
-    }
-  }
-  for (i=0; i<n; i++) {
-    if (aux[i] == null_literal) {
-      // TODO?: use a simpler/faster constructor
-      // rather than the generic make_xor2
-      aux[i] = bit_blaster_make_xor2(s, a[i], b[i]);
-    }
-  }
-
-  // assert not(l) == (or (xor a[0] b[0]) ... (xor a[n-1] b[n-1]))
-  bit_blaster_or_gate(s, n, aux, not(l));
 }
 
 
@@ -2322,26 +2306,18 @@ void bit_blaster_make_bvuge2(bit_blaster_t *s, literal_t *a, literal_t *b, liter
 
   switch (base_value(s, l)) {
   case VAL_FALSE:
-    if (s->solver->unsat_core_enabled)
-      goto default_case;
     bit_blaster_assert_bvult(s, a, b, n);
     break;
 
   case VAL_TRUE:
-    if (s->solver->unsat_core_enabled)
-      goto default_case;
     bit_blaster_assert_bvuge(s, a, b, n);
     break;
 
   default:
-    goto default_case;
+    l0 = bit_blaster_make_bvuge(s, a, b, n);
+    bit_blaster_eq(s, l0, l);
     break;
   }
-  return;
-
-  default_case:
-  l0 = bit_blaster_make_bvuge(s, a, b, n);
-  bit_blaster_eq(s, l0, l);
 }
 
 
@@ -2355,30 +2331,22 @@ void bit_blaster_make_bvsge2(bit_blaster_t *s, literal_t *a, literal_t *b, liter
 
   switch (base_value(s, l)) {
   case VAL_FALSE:
-    if (s->solver->unsat_core_enabled)
-      goto default_case;
     bit_blaster_assert_bvslt(s, a, b, n);
     break;
 
   case VAL_TRUE:
-    if (s->solver->unsat_core_enabled)
-      goto default_case;
     bit_blaster_assert_bvsge(s, a, b, n);
     break;
 
   default:
-    goto default_case;
+    c = find_cmp_cut(s, b[n-1], a[n-1]);
+    if (c != null_literal) {
+      bit_blaster_eq(s, c, l);
+    } else {
+      c = bit_blaster_make_bvuge(s, a, b, n-1);
+      bit_blaster_cmp(s, b[n-1], a[n-1], c, l);
+    }
     break;
-  }
-  return;
-
-  default_case:
-  c = find_cmp_cut(s, b[n-1], a[n-1]);
-  if (c != null_literal) {
-    bit_blaster_eq(s, c, l);
-  } else {
-    c = bit_blaster_make_bvuge(s, a, b, n-1);
-    bit_blaster_cmp(s, b[n-1], a[n-1], c, l);
   }
 }
 

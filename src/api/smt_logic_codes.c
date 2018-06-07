@@ -36,7 +36,6 @@ static const char * const smt_logic_names[NUM_SMT_LOGIC_NAMES] = {
   "ABV",
   "ALIA",
   "ALIRA",
-  "ALL",
   "ALRA",
   "ANIA",
   "ANIRA",
@@ -117,7 +116,6 @@ static const smt_logic_t smt_code[NUM_SMT_LOGIC_NAMES] = {
   ABV,
   ALIA,
   ALIRA,
-  SMT_ALL,
   ALRA,
   ANIA,
   ANIRA,
@@ -343,8 +341,6 @@ static const uint8_t has_arrays[NUM_SMT_LOGICS] = {
   true,   // QF_AUFNIA
   true,   // QF_AUFNRA
   true,   // QF_AUFNIRA
-
-  true,   // SMT_ALL: QF_AUFLIRA + QF_BV
 };
 
 static const uint8_t has_bv[NUM_SMT_LOGICS] = {
@@ -421,8 +417,6 @@ static const uint8_t has_bv[NUM_SMT_LOGICS] = {
   false,  // QF_AUFNIA
   false,  // QF_AUFNRA
   false,  // QF_AUFNIRA
-
-  true,   // SMT_ALL: QF_AUFLIRA + QF_BV
 };
 
 static const uint8_t has_quantifiers[NUM_SMT_LOGICS] = {
@@ -499,8 +493,6 @@ static const uint8_t has_quantifiers[NUM_SMT_LOGICS] = {
   false,  // QF_AUFNIA
   false,  // QF_AUFNRA
   false,  // QF_AUFNIRA
-
-  false,   // SMT_ALL: QF_AUFLIRA + QF_BV
 };
 
 static const uint8_t has_uf[NUM_SMT_LOGICS] = {
@@ -577,8 +569,6 @@ static const uint8_t has_uf[NUM_SMT_LOGICS] = {
   true,   // QF_AUFNIA
   true,   // QF_AUFNRA
   true,   // QF_AUFNIRA
-
-  true,   // SMT_ALL: QF_AUFLIRA + QF_BV
 };
 
 static const uint8_t arith_frag[NUM_SMT_LOGICS] = {
@@ -655,8 +645,6 @@ static const uint8_t arith_frag[NUM_SMT_LOGICS] = {
   ARITH_NIA,    // QF_AUFNIA
   ARITH_NRA,    // QF_AUFNRA
   ARITH_NIRA,   // QF_AUFNIRA
-
-  ARITH_LIRA,   // SMT_ALL: QF_AUFLIRA + QF_BV
 };
 
 
@@ -691,99 +679,6 @@ bool logic_has_uf(smt_logic_t code) {
 arith_fragment_t arith_fragment(smt_logic_t code) {
   assert(code != SMT_UNKNOWN);
   return arith_frag[code];
-}
-
-
-/*
- * Table for conversion to a quantifier-free fragment
- */
-static const smt_logic_t logic2qf[NUM_SMT_LOGICS] = {
-  NONE,
-
-  /*
-   * All quantified codes
-   */
-  QF_AX,
-  QF_BV,
-  QF_IDL,
-  QF_LIA,
-  QF_LRA,
-  QF_LIRA,
-  QF_NIA,
-  QF_NRA,
-  QF_NIRA,
-  QF_RDL,
-  QF_UF,
-  QF_ABV,
-  QF_ALIA,
-  QF_ALRA,
-  QF_ALIRA,
-  QF_ANIA,
-  QF_ANRA,
-  QF_ANIRA,
-  QF_AUF,
-  QF_UFBV,
-  QF_UFIDL,
-  QF_UFLIA,
-  QF_UFLRA,
-  QF_UFLIRA,
-  QF_UFNIA,
-  QF_UFNRA,
-  QF_UFNIRA,
-  QF_UFRDL,
-  QF_AUFBV,
-  QF_AUFLIA,
-  QF_AUFLRA,
-  QF_AUFLIRA,
-  QF_AUFNIA,
-  QF_AUFNRA,
-  QF_AUFNIRA,
-
-  /*
-   * Already quantifier
-   */
-  QF_AX,
-  QF_BV,
-  QF_IDL,
-  QF_LIA,
-  QF_LRA,
-  QF_LIRA,
-  QF_NIA,
-  QF_NRA,
-  QF_NIRA,
-  QF_RDL,
-  QF_UF,
-  QF_ABV,
-  QF_ALIA,
-  QF_ALRA,
-  QF_ALIRA,
-  QF_ANIA,
-  QF_ANRA,
-  QF_ANIRA,
-  QF_AUF,
-  QF_UFBV,
-  QF_UFIDL,
-  QF_UFLIA,
-  QF_UFLRA,
-  QF_UFLIRA,
-  QF_UFNIA,
-  QF_UFNRA,
-  QF_UFNIRA,
-  QF_UFRDL,
-  QF_AUFBV,
-  QF_AUFLIA,
-  QF_AUFLRA,
-  QF_AUFLIRA,
-  QF_AUFNIA,
-  QF_AUFNRA,
-  QF_AUFNIRA,
-
-  SMT_ALL,
-};
-
-smt_logic_t qf_fragment(smt_logic_t code) {
-  assert(code != SMT_UNKNOWN);
-  return logic2qf[code];
 }
 
 
@@ -866,8 +761,6 @@ static const bool is_official[NUM_SMT_LOGICS] = {
   true,   // QF_AUFNIA
   true,   // QF_AUFNRA
   true,   // QF_AUFNIRA
-
-  true,   // logic ALL is in SMT-LIB 2.5
 };
 
 
@@ -875,5 +768,3 @@ bool logic_is_official(smt_logic_t code) {
   assert(code != SMT_UNKNOWN);
   return is_official[code];
 }
-
-

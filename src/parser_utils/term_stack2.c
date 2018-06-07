@@ -33,7 +33,6 @@
 #include "api/yices_extensions.h"
 #include "api/yices_globals.h"
 #include "parser_utils/term_stack2.h"
-#include "parser_utils/tstack_internals.h"
 #include "terms/bv64_constants.h"
 #include "terms/bv_constants.h"
 #include "terms/bvarith64_buffer_terms.h"
@@ -190,9 +189,6 @@ static void alloc_tstack(tstack_t *stack, uint32_t nops) {
 
   stack->aux_buffer = (int32_t *) safe_malloc(DEFAULT_AUX_SIZE * sizeof(int32_t));
   stack->aux_size = DEFAULT_AUX_SIZE;
-
-  stack->sbuffer = NULL;
-  stack->sbuffer_size = 0;
 
   init_bvconstant(&stack->bvconst_buffer);
 
@@ -799,7 +795,6 @@ static void recycle_bvlbuffer(tstack_t *stack, bvlogic_buffer_t *b) {
  */
 void extend_aux_buffer(tstack_t *stack, uint32_t n) {
   uint32_t new_size;
-
   assert (stack->aux_size < n);
 
   new_size = stack->aux_size + 1;
@@ -815,26 +810,12 @@ void extend_aux_buffer(tstack_t *stack, uint32_t n) {
 }
 
 
-/*
- * Make the symbol buffer large enough for n symbols
- */
-void extend_sbuffer(tstack_t *stack, uint32_t n) {
-  uint32_t new_size;
-
-  assert(stack->sbuffer_size < n);
-
-  new_size = stack->sbuffer_size + 1;
-  new_size += new_size;
-  if (new_size < n) new_size = n;
-
-  if (new_size > MAX_SBUFFER_SIZE) {
-    out_of_memory();
+static inline int32_t *get_aux_buffer(tstack_t *stack, uint32_t n) {
+  if (stack->aux_size < n) {
+    extend_aux_buffer(stack, n);
   }
-
-  stack->sbuffer = (signed_symbol_t *) safe_realloc(stack->sbuffer, new_size * sizeof(signed_symbol_t));
-  stack->sbuffer_size = new_size;
+  return stack->aux_buffer;
 }
-
 
 
 
@@ -1006,14 +987,6 @@ void set_term_result(tstack_t *stack, term_t t) {
   e->val.term = t;
 }
 
-void set_special_term_result(tstack_t *stack, term_t t) {
-  stack_elem_t *e;
-
-  e = stack->elem + (stack->top - 1);
-  e->tag = TAG_SPECIAL_TERM;
-  e->val.term = t;
-}
-
 void set_type_result(tstack_t *stack, type_t tau) {
   stack_elem_t *e;
 
@@ -1123,6 +1096,10 @@ void set_aval_result(tstack_t *stack, aval_t v) {
 
 
 
+// no result: remove the top element
+static inline void no_result(tstack_t *stack) {
+  stack->top --;
+}
 
 
 
@@ -1150,10 +1127,6 @@ static void print_elem(tstack_t *stack, stack_elem_t *e) {
     printf("<symbol: %s>", e->val.string);
     break;
 
-  case TAG_NOT_SYMBOL:
-    printf("<not symbol: %s>", e->val.string);
-    break;
-
   case TAG_BV64:
     printf("<bitvector: ");
     bvconst64_print(stdout, e->val.bv64.value, e->val.bv64.bitsize);
@@ -1174,12 +1147,6 @@ static void print_elem(tstack_t *stack, stack_elem_t *e) {
 
   case TAG_TERM:
     printf("<term: ");
-    print_term_id(stdout, e->val.term);
-    printf(">");
-    break;
-
-  case TAG_SPECIAL_TERM:
-    printf("<special-term: ");
     print_term_id(stdout, e->val.term);
     printf(">");
     break;
@@ -1404,7 +1371,6 @@ term_t get_term(tstack_t *stack, stack_elem_t *e) {
 
   switch (e->tag) {
   case TAG_TERM:
-  case TAG_SPECIAL_TERM:
     t = e->val.term;
     break;
 
@@ -1500,7 +1466,6 @@ rational_t *get_divisor(tstack_t *stack, stack_elem_t *den) {
     break;
 
   case TAG_TERM:
-  case TAG_SPECIAL_TERM:
     terms = __yices_globals.terms;
     t = den->val.term;
     if (term_kind(terms, t) == ARITH_CONSTANT) {
@@ -1562,7 +1527,6 @@ static bool elem_is_nz_constant(stack_elem_t *e, rational_t *result) {
     break;
 
   case TAG_TERM:
-  case TAG_SPECIAL_TERM:
     terms = __yices_globals.terms;
     t = e->val.term;
     if (term_kind(terms, t) == ARITH_CONSTANT) {
@@ -1614,7 +1578,6 @@ static uint32_t elem_bitsize(tstack_t *stack, stack_elem_t *e) {
     break;
 
   case TAG_TERM:
-  case TAG_SPECIAL_TERM:
     t = e->val.term;
     if (! yices_check_bv_term(t)) {
       report_yices_error(stack);
@@ -1668,7 +1631,6 @@ static term_t elem_bit_select(tstack_t *stack, stack_elem_t *e, uint32_t i) {
     break;
 
   case TAG_TERM:
-  case TAG_SPECIAL_TERM:
     t = yices_bitextract(e->val.term, i);
     break;
 
@@ -1697,13 +1659,13 @@ static term_t elem_bit_select(tstack_t *stack, stack_elem_t *e, uint32_t i) {
 
 /*
  * Verify that element e is a bitvector term of bitsize equal to n
- * - e must have tag = TAG_TERM or TAG_SPECIAL_TERM
+ * - e must have tag = TAG_TERM
  * - raise an exception if t is not
  */
 static void check_bv_term(tstack_t *stack, stack_elem_t *e, uint32_t n) {
   term_t t;
 
-  assert(e->tag == TAG_TERM || e->tag == TAG_SPECIAL_TERM);
+  assert(e->tag == TAG_TERM);
   t = e->val.term;
 
   if (! yices_check_bv_term(t)) {
@@ -1731,7 +1693,6 @@ void add_elem(tstack_t *stack, rba_buffer_t *b, stack_elem_t *e) {
     break;
 
   case TAG_TERM:
-  case TAG_SPECIAL_TERM:
     if (! yices_check_arith_term(e->val.term)) {
       report_yices_error(stack);
     }
@@ -1763,7 +1724,6 @@ void neg_elem(tstack_t *stack, stack_elem_t *e) {
     break;
 
   case TAG_TERM:
-  case TAG_SPECIAL_TERM:
     t = e->val.term;
     terms = __yices_globals.terms;
     if (! yices_check_arith_term(t)) {
@@ -1809,7 +1769,6 @@ void sub_elem(tstack_t *stack, rba_buffer_t *b, stack_elem_t *e) {
     break;
 
   case TAG_TERM:
-  case TAG_SPECIAL_TERM:
     if (! yices_check_arith_term(e->val.term)) {
       report_yices_error(stack);
     }
@@ -1837,7 +1796,6 @@ void mul_elem(tstack_t *stack, rba_buffer_t *b, stack_elem_t *e) {
     break;
 
   case TAG_TERM:
-  case TAG_SPECIAL_TERM:
     if (! yices_check_arith_term(e->val.term) ||
         ! yices_check_mul_term(b, e->val.term)) {
       report_yices_error(stack);
@@ -1891,7 +1849,6 @@ void bva64_add_elem(tstack_t *stack, bvarith64_buffer_t *b, stack_elem_t *e) {
     break;
 
   case TAG_TERM:
-  case TAG_SPECIAL_TERM:
     check_bv_term(stack, e, n);
     bvarith64_buffer_add_term(b, __yices_globals.terms, e->val.term);
     break;
@@ -1950,7 +1907,6 @@ void bva64_sub_elem(tstack_t *stack, bvarith64_buffer_t *b, stack_elem_t *e) {
     break;
 
   case TAG_TERM:
-  case TAG_SPECIAL_TERM:
     check_bv_term(stack, e, n);
     bvarith64_buffer_sub_term(b, __yices_globals.terms, e->val.term);
     break;
@@ -2012,7 +1968,6 @@ void bva64_mul_elem(tstack_t *stack, bvarith64_buffer_t *b, stack_elem_t *e) {
     break;
 
   case TAG_TERM:
-  case TAG_SPECIAL_TERM:
     check_bv_term(stack, e, n);
     t = e->val.term;
     terms = __yices_globals.terms;
@@ -2089,7 +2044,6 @@ void bva_add_elem(tstack_t *stack, bvarith_buffer_t *b, stack_elem_t *e) {
     break;
 
   case TAG_TERM:
-  case TAG_SPECIAL_TERM:
     check_bv_term(stack, e, n);
     bvarith_buffer_add_term(b, __yices_globals.terms, e->val.term);
     break;
@@ -2148,7 +2102,6 @@ void bva_sub_elem(tstack_t *stack, bvarith_buffer_t *b, stack_elem_t *e) {
     break;
 
   case TAG_TERM:
-  case TAG_SPECIAL_TERM:
     check_bv_term(stack, e, n);
     bvarith_buffer_sub_term(b, __yices_globals.terms, e->val.term);
     break;
@@ -2209,7 +2162,6 @@ void bva_mul_elem(tstack_t *stack, bvarith_buffer_t *b, stack_elem_t *e) {
     break;
 
   case TAG_TERM:
-  case TAG_SPECIAL_TERM:
     check_bv_term(stack, e, n);
     t = e->val.term;
     terms = __yices_globals.terms;
@@ -2349,7 +2301,6 @@ void bvneg_elem(tstack_t *stack, stack_elem_t *e) {
     break;
 
   case TAG_TERM:
-  case TAG_SPECIAL_TERM:
     t = e->val.term;
     copy_bvneg_term(stack, e, t);
     break;
@@ -2403,7 +2354,6 @@ void bvl_set_elem(tstack_t *stack, bvlogic_buffer_t *b, stack_elem_t *e) {
     break;
 
   case TAG_TERM:
-  case TAG_SPECIAL_TERM:
     t = e->val.term;
     if (! yices_check_bv_term(t)) { // not a bitvector
       report_yices_error(stack);
@@ -2455,7 +2405,6 @@ void bvl_set_slice_elem(tstack_t *stack, bvlogic_buffer_t *b, uint32_t i, uint32
     break;
 
   case TAG_TERM:
-  case TAG_SPECIAL_TERM:
     t = e->val.term;
     if (! yices_check_bv_term(t)) { // not a bitvector
       report_yices_error(stack);
@@ -2497,7 +2446,6 @@ bool elem_is_bvconst(stack_elem_t *e) {
     return true;
 
   case TAG_TERM:
-  case TAG_SPECIAL_TERM:
     k = term_kind(__yices_globals.terms, e->val.term);
     return k == BV64_CONSTANT || k == BV_CONSTANT;
 
@@ -2555,7 +2503,6 @@ void bvconst_set_elem(bvconstant_t *c, stack_elem_t *e) {
     break;
 
   case TAG_TERM:
-  case TAG_SPECIAL_TERM:
     bvconstant_copy_term(c, e->val.term);
     break;
 
@@ -2603,7 +2550,6 @@ void bvand_elem(tstack_t *stack, bvlogic_buffer_t *b, stack_elem_t *e) {
     break;
 
   case TAG_TERM:
-  case TAG_SPECIAL_TERM:
     check_bv_term(stack, e, n);
     bvlogic_buffer_and_term(b, __yices_globals.terms, e->val.term);
     break;
@@ -2658,7 +2604,6 @@ void bvor_elem(tstack_t *stack, bvlogic_buffer_t *b, stack_elem_t *e) {
     break;
 
   case TAG_TERM:
-  case TAG_SPECIAL_TERM:
     check_bv_term(stack, e, n);
     bvlogic_buffer_or_term(b, __yices_globals.terms, e->val.term);
     break;
@@ -2713,7 +2658,6 @@ void bvxor_elem(tstack_t *stack, bvlogic_buffer_t *b, stack_elem_t *e) {
     break;
 
   case TAG_TERM:
-  case TAG_SPECIAL_TERM:
     check_bv_term(stack, e, n);
     bvlogic_buffer_xor_term(b, __yices_globals.terms, e->val.term);
     break;
@@ -2769,7 +2713,6 @@ void bvcomp_elem(tstack_t *stack, bvlogic_buffer_t *b, stack_elem_t *e) {
     break;
 
   case TAG_TERM:
-  case TAG_SPECIAL_TERM:
     check_bv_term(stack, e, n);
     bvlogic_buffer_comp_term(b, __yices_globals.terms, e->val.term);
     break;
@@ -2818,7 +2761,6 @@ void bvconcat_elem(tstack_t *stack, bvlogic_buffer_t *b, stack_elem_t *e) {
     break;
 
   case TAG_TERM:
-  case TAG_SPECIAL_TERM:
     t = e->val.term;
     if (! yices_check_bv_term(t)) {
       report_yices_error(stack);

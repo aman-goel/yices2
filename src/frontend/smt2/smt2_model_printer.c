@@ -29,7 +29,6 @@
 #include "frontend/smt2/smt2_printer.h"
 #include "model/model_eval.h"
 #include "utils/int_vectors.h"
-#include "utils/int_array_sort.h"
 
 
 /*
@@ -168,8 +167,6 @@ void smt2_pp_model(yices_pp_t *printer, model_t *model) {
 
   init_ivector(&v, 0);
   model_collect_terms(model, false, model->terms, is_named_unint, &v);
-
-  int_array_sort(v.data, v.size);
 
   n = v.size;
   a = v.data;
@@ -340,10 +337,6 @@ void smt2_pp_full_model(yices_pp_t *printer, model_t *model) {
     ivector_reset(&v);
     model_collect_terms(model, false, model->terms, is_named_unint, &v);
     evaluator_collect_cached_terms(&eval, model->terms, is_named_unint, &v);
-
-    // sort the terms so that we have consistent printouts with different
-    // algorithms
-    int_array_sort(v.data, v.size);
 
     // print everything
     n = v.size;

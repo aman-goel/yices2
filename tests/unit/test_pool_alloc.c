@@ -180,6 +180,7 @@ enum {
 static int32_t build_instance(char *filename) {
   uint32_t i, j, l;
   literal_t literal;
+  cidx_t cidx;
   int n, nv, nc;
   char *s;
   FILE *f;
@@ -247,7 +248,7 @@ static int32_t build_instance(char *filename) {
       fclose(f);
       return FORMAT_ERROR;
     }
-    (void) clause_pool_add_problem_clause(&pool, j, clause);
+    cidx = clause_pool_add_problem_clause(&pool, j, clause);
     i ++;
   }
   delete_buffer();

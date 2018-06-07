@@ -480,10 +480,6 @@ static inline uint32_t simplex_num_branch_and_bound(simplex_solver_t *solver) {
   return solver->stats.num_branch_atoms;
 }
 
-static inline uint32_t simplex_num_gomory_cuts(simplex_solver_t *solver) {
-  return solver->stats.num_gomory_cuts;
-}
-
 static inline uint32_t simplex_num_bound_conflicts(simplex_solver_t *solver) {
   return solver->stats.num_bound_conflicts;
 }
