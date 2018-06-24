@@ -101,7 +101,7 @@
 #include "utils/string_utils.h"
 
 #define TRACE 0
-#define DEBUG 1
+#define DEBUG 0
 
 #ifdef HAVE_MCSAT
 #include <poly/algebraic_number.h>
@@ -9480,6 +9480,10 @@ EXPORTED extern bool yices_get_presearch_stats(context_t *ctx, stats_t *st) {
  */
 EXPORTED extern bool yices_get_statistics(context_t *ctx, stats_t *st) {
   return yices_collect_statistics(ctx, st);
+}
+
+EXPORTED void y2_show_statistics(FILE *f, context_t *ctx) {
+	yices_show_statistics(f, ctx);
 }
 
 /*

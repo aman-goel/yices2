@@ -243,6 +243,124 @@ void yices_print_presearch_stats(FILE *f, context_t *ctx) {
   fflush(f);
 }
 
+/*
+ * Statistics about each solvers
+ */
+void yices_show_core_stats(FILE *f, smt_core_t *core) {
+  fprintf(f, " :boolean-variables %"PRIu32"\n", num_vars(core));
+  fprintf(f, " :atoms %"PRIu32"\n", num_atoms(core));
+  fprintf(f, " :clauses %"PRIu32"\n", num_clauses(core));
+  fprintf(f, " :restarts %"PRIu32"\n", num_restarts(core));
+  fprintf(f, " :clause-db-reduce %"PRIu32"\n", num_reduce_calls(core));
+  fprintf(f, " :clause-db-simplify %"PRIu32"\n", num_simplify_calls(core));
+  fprintf(f, " :decisions %"PRIu64"\n", num_decisions(core));
+  fprintf(f, " :conflicts %"PRIu64"\n", num_conflicts(core));
+  fprintf(f, " :theory-conflicts %"PRIu32"\n", num_theory_conflicts(core));
+  fprintf(f, " :boolean-propagations %"PRIu64"\n", num_propagations(core));
+  fprintf(f, " :theory-propagations %"PRIu32"\n", num_theory_propagations(core));
+}
+
+void yices_show_egraph_stats(FILE *f, egraph_t *egraph) {
+  fprintf(f, " :egraph-terms %"PRIu32"\n", egraph_num_terms(egraph));
+  fprintf(f, " :egraph-atoms %"PRIu32"\n", egraph_num_atoms(egraph));
+  fprintf(f, " :egraph-conflicts %"PRIu32"\n", egraph_num_conflicts(egraph));
+  fprintf(f, " :egraph-ackermann-lemmas %"PRIu32"\n", egraph_all_ackermann(egraph));
+  fprintf(f, " :egraph-final-checks %"PRIu32"\n", egraph_num_final_checks(egraph));
+  fprintf(f, " :egraph-interface-lemmas %"PRIu32"\n", egraph_num_interface_eqs(egraph));
+}
+
+void yices_show_funsolver_stats(FILE *f, fun_solver_t *solver) {
+  fprintf(f, " :array-vars %"PRIu32"\n", fun_solver_num_vars(solver));
+  fprintf(f, " :array-edges %"PRIu32"\n", fun_solver_num_edges(solver));
+  fprintf(f, " :array-update1-axioms %"PRIu32"\n", fun_solver_num_update1_axioms(solver));
+  fprintf(f, " :array-update2-axioms %"PRIu32"\n", fun_solver_num_update2_axioms(solver));
+  fprintf(f, " :array-extensionality-axioms %"PRIu32"\n", fun_solver_num_extensionality_axioms(solver));
+}
+
+void yices_show_simplex_stats(FILE *f, simplex_solver_t *solver) {
+  simplex_collect_statistics(solver);
+  fprintf(f, " :simplex-init-vars %"PRIu32"\n", simplex_num_init_vars(solver));
+  fprintf(f, " :simplex-init-rows %"PRIu32"\n", simplex_num_init_rows(solver));
+  fprintf(f, " :simplex-init-atoms %"PRIu32"\n", simplex_num_init_atoms(solver));
+  fprintf(f, " :simplex-vars %"PRIu32"\n", simplex_num_vars(solver));
+  fprintf(f, " :simplex-rows %"PRIu32"\n", simplex_num_rows(solver));
+  fprintf(f, " :simplex-atoms %"PRIu32"\n", simplex_num_atoms(solver));
+  fprintf(f, " :simplex-pivots %"PRIu32"\n", simplex_num_pivots(solver));
+  fprintf(f, " :simplex-conflicts %"PRIu32"\n", simplex_num_conflicts(solver));
+  fprintf(f, " :simplex-interface-lemmas %"PRIu32"\n", simplex_num_interface_lemmas(solver));
+  if (simplex_num_make_integer_feasible(solver) > 0 ||
+      simplex_num_dioph_checks(solver) > 0) {
+    fprintf(f, " :simplex-integer-vars %"PRIu32"\n", simplex_num_integer_vars(solver));
+    fprintf(f, " :simplex-branch-and-bound %"PRIu32"\n", simplex_num_branch_and_bound(solver));
+    fprintf(f, " :simplex-gomory-cuts %"PRIu32"\n", simplex_num_gomory_cuts(solver));
+    // bound strenthening
+    fprintf(f, " :simplex-bound-conflicts %"PRIu32"\n", simplex_num_bound_conflicts(solver));
+    fprintf(f, " :simplex-bound-recheck-conflicts %"PRIu32"\n", simplex_num_bound_recheck_conflicts(solver));
+    // integrality test
+    fprintf(f, " :simplex-itest-conflicts %"PRIu32"\n", simplex_num_itest_conflicts(solver));
+    fprintf(f, " :simplex-itest-bound-conflicts %"PRIu32"\n", simplex_num_itest_bound_conflicts(solver));
+    fprintf(f, " :simplex-itest-recheck-conflicts %"PRIu32"\n", simplex_num_itest_bound_conflicts(solver));
+    // diophantine solver
+    fprintf(f, " :simplex-gcd-conflicts %"PRIu32"\n", simplex_num_dioph_gcd_conflicts(solver));
+    fprintf(f, " :simplex-dioph-checks %"PRIu32"\n", simplex_num_dioph_checks(solver));
+    fprintf(f, " :simplex-dioph-conflicts %"PRIu32"\n", simplex_num_dioph_conflicts(solver));
+    fprintf(f, " :simplex-dioph-bound-conflicts %"PRIu32"\n", simplex_num_dioph_bound_conflicts(solver));
+    fprintf(f, " :simplex-dioph-recheck-conflicts %"PRIu32"\n", simplex_num_dioph_recheck_conflicts(solver));
+  }
+}
+
+void yices_show_bvsolver_stats(FILE *f, bv_solver_t *solver) {
+	fprintf(f, " :bvsolver-vars %"PRIu32"\n", bv_solver_num_vars(solver));
+	fprintf(f, " :bvsolver-atoms %"PRIu32"\n", bv_solver_num_atoms(solver));
+	fprintf(f, " :bvsolver-equiv-lemmas %"PRIu32"\n", bv_solver_equiv_lemmas(solver));
+  fprintf(f, " :bvsolver-interface-lemmas %"PRIu32"\n", bv_solver_interface_lemmas(solver));
+}
+
+static void yices_show_idl_fw_stats(FILE *f, idl_solver_t *solver) {
+	fprintf(f, " :idl-solver-vars %"PRIu32"\n", idl_num_vars(solver));
+	fprintf(f, " :idl-solver-atoms %"PRIu32"\n", idl_num_atoms(solver));
+}
+
+static void yices_show_rdl_fw_stats(FILE *f, rdl_solver_t *solver) {
+  fprintf(f, " :rdl-solver-vars %"PRIu32"\n", rdl_num_vars(solver));
+  fprintf(f, " :rdl-solver-atoms %"PRIu32"\n", rdl_num_atoms(solver));
+}
+
+
+/*
+ * Context statistics
+ */
+static void yices_show_ctx_stats(FILE *f, context_t *ctx) {
+  assert(ctx->core != NULL);
+  yices_show_core_stats(f, ctx->core);
+
+  if (context_has_egraph(ctx)) {
+  	yices_show_egraph_stats(f, ctx->egraph);
+  }
+
+  if (context_has_fun_solver(ctx)) {
+  	yices_show_funsolver_stats(f, ctx->fun_solver);
+  }
+  if (context_has_arith_solver(ctx)) {
+    if (context_has_simplex_solver(ctx)) {
+    	yices_show_simplex_stats(f, ctx->arith_solver);
+    } else if (context_has_idl_solver(ctx)) {
+    	yices_show_idl_fw_stats(f, ctx->arith_solver);
+    } else {
+      assert(context_has_rdl_solver(ctx));
+      yices_show_rdl_fw_stats(f, ctx->arith_solver);
+    }
+  }
+
+  if (context_has_bv_solver(ctx)) {
+  	yices_show_bvsolver_stats(f, ctx->bv_solver);
+  }
+
+  if (ctx->mcsat != NULL) {
+    mcsat_show_stats(ctx->mcsat, f);
+  }
+}
+
 void yices_show_statistics(FILE *f, context_t *ctx) {
   smt_core_t *core;
   egraph_t *egraph;
@@ -251,6 +369,23 @@ void yices_show_statistics(FILE *f, context_t *ctx) {
 
   core = ctx->core;
   egraph = ctx->egraph;
+
+  double time = 0, mem = 0;
+
+//  time = get_cpu_time();
+//  mem = mem_size() / (1024*1024);
+
+  fprintf(f, "(:num-terms %"PRIu32"\n", yices_num_terms());
+  fprintf(f, " :num-types %"PRIu32"\n", yices_num_types());
+  fprintf(f, " :total-run-time %.3f\n", time);
+  if (mem > 0) {
+  	fprintf(f, " :mem-usage %.3f\n", mem);
+  }
+  if (ctx != NULL) {
+  	yices_show_ctx_stats(f, ctx);
+  }
+  fprintf(f, ")\n");
+
 
   show_detail_stats(f, &core->tstats);
   show_stats(f, &core->stats);

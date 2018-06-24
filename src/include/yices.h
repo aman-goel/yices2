@@ -4078,6 +4078,13 @@ __YICES_DLLSPEC__ extern bool yices_get_statistics(context_t *ctx, stats_t *st);
 
 
 /*
+ * Show statistics
+ *
+ */
+__YICES_DLLSPEC__ extern void y2_show_statistics(FILE *f, context_t *ctx);
+
+
+/*
  * Dump context
  *
  */
